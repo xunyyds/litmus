@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Litmus 靶包（canary）。契约见 docs/04-契约.md。
+
+  注意 appComponentFactory 这一行是**故意的占位属性**：
+  部分手工打包器对「清单里没有就新增属性、有就替换值”」两种分支处理不一致，
+  新增属性在某些设备的 PackageParser 上会被忽略，导致注入桩不生效。
+  这里预置一个系统自带的空实现，逼打包器走「替换值」分支。
+  值本身不参与任何逻辑（LitmusApp 才是真正的入口）。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.litmus.canary"
+    android:versionCode="1"
+    android:versionName="0.1.0">
+
+    <uses-sdk
+        android:minSdkVersion="26"
+        android:targetSdkVersion="35" />
+
+    <!-- 用于扫框架包名 / 多开容器 / 模拟器相关包；tier C 弱信号专用 -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+    <!--
+      INTERNET 只用于 **loopback** 探测（127.0.0.1:27042/27043 的 frida-server 默认端口）。
+      Android 建 socket 一律要求该权限，即使目标是自己。
+      本应用没有任何外发请求：全仓库不存在 http 客户端、上报地址或统计 SDK。
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:name=".LitmusApp"
+        android:allowBackup="false"
+        android:appComponentFactory="android.app.AppComponentFactory"
+        android:extractNativeLibs="true"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          应用内 HTML 报告预览。exported=true 是有意的：
+          验收与 CI 都要能用 `adb shell am start -n io.litmus.canary/.ReportViewer` 直接拉起，
+          而它只渲染本应用自己生成的报告（不含任何凭据），暴露面等于零。
+        -->
+        <activity
+            android:name=".ReportViewer"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="true"
+            android:label="@string/app_name" />
+    </application>
+</manifest>
