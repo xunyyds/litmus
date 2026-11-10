@@ -1047,7 +1047,7 @@ def render_html(run_json: dict, docs=None, paths=None) -> str:
     parts.append('<div class="wrap">')
     parts.append(
         '<div class="topbar"><div class="brand"><span class="dot"></span>'
-        "<span>ARGUS</span><span>·</span><span>百眼检测</span>"
+        "<span>试金石</span><span>·</span><span>TAMPER DETECTION REPORT</span>"
         '<span class="eyebrow">Tamper Detection Report</span></div>'
         "<h1>%s</h1>"
         '<div class="meta">%s ｜ 框架 %s ｜ %s ｜ 报告来源 <code>%s</code></div>'
