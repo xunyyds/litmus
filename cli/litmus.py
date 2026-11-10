@@ -56,10 +56,18 @@ ACTIVITY = "%s/.MainActivity" % PKG
 LOG_TAG = "LitmusReport"
 REMOTE_DIR = "/sdcard/Android/data/%s/files/litmus" % PKG
 
-DEFAULT_ADB_CANDIDATES = (
-    r"D:\dev\android-sdk\platform-tools\adb.exe",
-    r"C:\android-sdk\platform-tools\adb.exe",
-)
+def _sdk_adb_candidates() -> tuple[str, ...]:
+    """从 ANDROID_SDK_ROOT / ANDROID_HOME 推 adb 的常见位置。
+
+    不写死任何盘符：仓库是公开的，机器路径写进来既没用又难看。
+    """
+    exe = "adb.exe" if os.name == "nt" else "adb"
+    out = []
+    for var in ("ANDROID_SDK_ROOT", "ANDROID_HOME"):
+        root = os.environ.get(var)
+        if root:
+            out.append(str(Path(root) / "platform-tools" / exe))
+    return tuple(out)
 
 BUILD_INFO_REL = Path("canary") / "out" / "build-info.json"
 
@@ -235,7 +243,7 @@ def find_adb(explicit=None) -> str:
         p = Path(env)
         if p.is_file():
             return str(p)
-    for cand in DEFAULT_ADB_CANDIDATES:
+    for cand in _sdk_adb_candidates():
         if Path(cand).is_file():
             return cand
     found = shutil.which("adb")

@@ -161,7 +161,7 @@ python cli\litmus.py score --report runs\C1-litmus-20261110-184039\report.raw.js
 
 - 本次运行：`C1-litmus`（none）· profile `standard` · CLI 0.1.0
 - 报告来源：`logcat:chunk(6)` · App 侧运行 id `f4da99935b0144d8`
-- 构建产物：`D:\ovo\wrok\fpa\litmus\canary\out\litmus-canary-0.1.0.apk` · 0.1.0 · 构建于 2026-11-10T10:40:13Z
+- 构建产物：`canary/out/litmus-canary-0.1.0.apk` · 0.1.0 · 构建于 2026-11-10T10:40:13Z
 - 原始数据：`runs\C1-litmus-20261110-184039\run.json`（全量记账）与 `runs\C1-litmus-20261110-184039\report.raw.json`（App 原始报告）
 - 向量覆盖率：目录声明 53 条，本次上报 45 条；未上报 8 条（`rt.art.entrypoint`、`rt.maps.cross_view`、`rt.signal.handlers`、`inj.loader.solist`、`inj.dex.inmemory`、`priv.caps`、`pkg.split`、`virt.vapp.binder`）
 - 评分一致性：App 自算 94.0 分 vs CLI 重算 94.0 分（差 0.0）—— 一致

@@ -34,11 +34,11 @@ if (-not $InputApk) { $InputApk = Join-Path $RepoRoot 'canary\out\litmus-canary-
 if (-not $OutApk) { $OutApk = Join-Path $RepoRoot 'canary\out\demo-repacked.apk' }
 if (-not (Test-Path $InputApk)) { throw "找不到输入 APK：$InputApk" }
 
-$JdkHome = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { 'D:\dev\jdk-21\jdk-21.0.12.1+1' }
+$JdkHome = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { Split-Path (Split-Path (Get-Command javac).Source -Parent) -Parent }
 $SdkRoot = if ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT }
            elseif ($env:ANDROID_HOME) { $env:ANDROID_HOME }
-           else { 'D:\dev\android-sdk' }
-$BuildTools = Join-Path $SdkRoot 'build-tools\37.0.0'
+           else { throw '请设置 ANDROID_SDK_ROOT 或 ANDROID_HOME' }
+$BuildTools = (Get-ChildItem (Join-Path $SdkRoot 'build-tools') -Directory | Sort-Object Name -Descending | Select-Object -First 1).FullName
 $Keytool = Join-Path $JdkHome 'bin\keytool.exe'
 $ZipAlign = Join-Path $BuildTools 'zipalign.exe'
 $ApkSigner = Join-Path $BuildTools 'apksigner.bat'

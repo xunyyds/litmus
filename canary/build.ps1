@@ -57,7 +57,7 @@ param(
     [switch]$KeepWork,
     [int]$MinSdk = 26,
     [int]$TargetSdk = 35,
-    [string]$CompileSdk = 'android-37.0',
+    [string]$CompileSdk = '',
     [string]$Abis = 'arm64-v8a,x86_64',
     [string]$Version = '0.1.0'
 )
@@ -94,11 +94,37 @@ function New-Dir([string]$path) { if (-not (Test-Path $path)) { New-Item -ItemTy
 # ================================================================ 01 环境
 Write-Step '定位 JDK / Android SDK / build-tools'
 
-$JdkHome = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { 'D:\dev\jdk-21\jdk-21.0.12.1+1' }
+# 工具链全部靠环境自动探测：公开仓库里不写死任何盘符
+$JdkHome = if ($env:JAVA_HOME) { $env:JAVA_HOME } else {
+    $javacCmd = Get-Command javac -ErrorAction SilentlyContinue
+    if ($javacCmd) { Split-Path (Split-Path $javacCmd.Source -Parent) -Parent } else { '' }
+}
 $SdkRoot = if ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT }
            elseif ($env:ANDROID_HOME) { $env:ANDROID_HOME }
-           else { 'D:\dev\android-sdk' }
-$BuildTools = if ($env:ANDROID_BUILD_TOOLS) { $env:ANDROID_BUILD_TOOLS } else { Join-Path $SdkRoot 'build-tools\37.0.0' }
+           else { '' }
+if (-not $SdkRoot -or -not (Test-Path $SdkRoot)) {
+    Fail '找不到 Android SDK：请设置 ANDROID_SDK_ROOT 或 ANDROID_HOME'
+}
+if (-not $JdkHome -or -not (Test-Path (Join-Path $JdkHome 'bin\javac.exe'))) {
+    Fail '找不到 JDK（需要 11+）：请设置 JAVA_HOME'
+}
+
+$BuildTools = if ($env:ANDROID_BUILD_TOOLS) { $env:ANDROID_BUILD_TOOLS } else {
+    $bt = Get-ChildItem (Join-Path $SdkRoot 'build-tools') -Directory -ErrorAction SilentlyContinue |
+          Sort-Object { [version]($_.Name -replace '[^0-9\.].*$','') } -Descending | Select-Object -First 1
+    if ($bt) { $bt.FullName } else { '' }
+}
+if (-not $BuildTools) { Fail "在 $SdkRoot\build-tools 下找不到任何 build-tools" }
+
+# 未指定编译平台时取已安装的最高版本
+if (-not $CompileSdk) {
+    $plat = Get-ChildItem (Join-Path $SdkRoot 'platforms') -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^android-\d' } |
+            Sort-Object { [int](($_.Name -replace '^android-','') -split '\.')[0] } -Descending |
+            Select-Object -First 1
+    if (-not $plat) { Fail "在 $SdkRoot\platforms 下找不到 android-* 平台" }
+    $CompileSdk = $plat.Name
+}
 $NdkRoot = if ($env:ANDROID_NDK) { $env:ANDROID_NDK } else { Join-Path $SdkRoot 'ndk\28.2.13676358' }
 
 $JavacExe = Join-Path $JdkHome 'bin\javac.exe'
