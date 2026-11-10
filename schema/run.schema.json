@@ -1,0 +1,225 @@
+{
+  "schema": "litmus.run/1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Litmus CLI 产出 run.json（契约 docs/04-契约.md §4.2，schema litmus.run/1）",
+  "description": "一次运行的全量记账：App 原始报告 + CLI 平面信号 + 评分 + 盲区 + 误报。绝对路径不写入本文件（相对仓库根），保证同一份数据可以在别的机器上复算。",
+  "type": "object",
+  "required": ["schema", "run", "expect", "signals", "score", "blindSpots", "falsePositives"],
+  "additionalProperties": true,
+  "properties": {
+    "schema": { "const": "litmus.run/1" },
+    "run": {
+      "type": "object",
+      "required": ["label", "profile", "startedAt"],
+      "properties": {
+        "id": { "type": "string" },
+        "appRunId": { "type": "string", "description": "App 报告里的 run.id，用于把 run.json 和设备上的 report-<id>.json 对上" },
+        "startedAt": { "type": "string" },
+        "finishedAt": { "type": "string" },
+        "label": { "type": "string", "description": "本次运行标签，matrix 的列名" },
+        "framework": { "type": "string", "description": "修补手段（frida / lsposed / repack / none…），v0.1 仅记账不做框架适配" },
+        "profile": { "type": "string", "enum": ["standard", "sig-only", "runtime"] },
+        "mode": { "type": "string", "enum": ["live", "offline", "fixture"] },
+        "reportSource": { "type": "string", "description": "报告来源：logcat:single / logcat:chunk(n) / sdcard / offline:… / fixture:…" },
+        "cliVersion": { "type": "string" },
+        "expectPath": { "type": ["string", "null"], "description": "相对仓库根" },
+        "baselinePath": { "type": ["string", "null"], "description": "相对仓库根" },
+        "device": {
+          "type": "object",
+          "properties": {
+            "serial": { "type": "string" },
+            "manufacturer": { "type": "string" },
+            "model": { "type": "string" },
+            "brand": { "type": "string" },
+            "sdk": { "type": ["integer", "null"] },
+            "release": { "type": "string" },
+            "fingerprint": { "type": "string" }
+          }
+        },
+        "app": {
+          "type": "object",
+          "properties": {
+            "package": { "type": "string" },
+            "pid": { "type": ["integer", "null"] },
+            "codePath": { "type": "string" }
+          }
+        }
+      }
+    },
+    "expect": {
+      "type": "object",
+      "description": "来自 canary/out/build-info.json（schema litmus.build/1），CLI 用它复核包完整性",
+      "properties": {
+        "apkSha256": { "type": ["string", "null"] },
+        "certSha256": { "type": ["string", "null"] },
+        "zipFingerprint": { "type": ["string", "null"] },
+        "version": { "type": ["string", "null"] },
+        "flavor": { "type": ["string", "null"] },
+        "apk": { "type": ["string", "null"] }
+      }
+    },
+    "app": { "type": "object", "description": "App 报告的 app 块，原样透传" },
+    "device": { "type": "object", "description": "App 报告的 device 块，原样透传" },
+    "producer": { "type": "object", "description": "App 报告的 producer 块，原样透传" },
+    "facts": { "type": "object", "description": "App 报告的 facts 块，原样透传（CLI 只用它复核，不修改）" },
+    "signals": {
+      "type": "array",
+      "description": "App 侧信号（原样透传，可能已规范 weight/confidence 取值）+ CLI 平面补的两条（plane=cli）",
+      "items": {
+        "type": "object",
+        "required": ["id", "category", "verdict", "weight", "tier"],
+        "properties": {
+          "id": { "type": "string" },
+          "category": {
+            "type": "string",
+            "enum": ["runtime-integrity", "injection", "package-integrity", "privilege", "virtualization", "environment"]
+          },
+          "verdict": { "type": "string", "enum": ["CLEAN", "SUSPECT", "TAMPERED", "UNKNOWN", "ERROR", "FLAKY"] },
+          "confidence": { "type": "number" },
+          "weight": { "type": "integer", "minimum": 1, "maximum": 5 },
+          "tier": { "type": "string", "enum": ["A", "B", "C"] },
+          "evidence": { "type": "string" },
+          "ms": { "type": "integer" },
+          "plane": { "type": ["string", "null"], "enum": ["cli", "self", "device", null], "description": "plane=cli 表示这条是 CLI 在进程外判定的" }
+        }
+      }
+    },
+    "score": {
+      "type": "object",
+      "required": ["litmus", "raw", "profile", "categories"],
+      "properties": {
+        "litmus": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100,
+          "description": "最终分：无 --baseline 时等于 raw；有 baseline 时按基线归一"
+        },
+        "raw": { "type": ["number", "null"], "description": "本次原始分（四舍五入 1 位，与 App 展示口径一致）" },
+        "rawExact": { "type": ["number", "null"], "description": "未四舍五入的 raw，基线归一用它，避免 --baseline 结果漂 0.1" },
+        "profile": { "type": "string", "enum": ["standard", "sig-only", "runtime"] },
+        "baseline": {
+          "type": ["object", "null"],
+          "properties": {
+            "raw": { "type": "number" },
+            "rawExact": { "type": "number" },
+            "litmus": { "type": "number" },
+            "path": { "type": ["string", "null"] }
+          }
+        },
+        "counts": {
+          "type": "object",
+          "properties": {
+            "total": { "type": "integer" },
+            "clean": { "type": "integer" },
+            "suspect": { "type": "integer" },
+            "tampered": { "type": "integer" },
+            "unknown": { "type": "integer" },
+            "error": { "type": "integer" },
+            "flaky": { "type": "integer" }
+          }
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "score", "weight"],
+            "properties": {
+              "id": { "type": "string" },
+              "label": { "type": "string", "description": "中文名" },
+              "score": { "type": ["number", "null"], "description": "null = 该类别无可计数向量" },
+              "scoreExact": { "type": ["number", "null"] },
+              "weight": { "type": "number", "description": "profile 下的聚合权重 a_k，可为 0（该 profile 不计权）" },
+              "counted": { "type": "boolean" },
+              "tampered": { "type": "integer" },
+              "suspect": { "type": "integer" },
+              "clean": { "type": "integer" },
+              "unknown": { "type": "integer" },
+              "error": { "type": "integer" },
+              "flaky": { "type": "integer" },
+              "total": { "type": "integer" },
+              "countedWeight": { "type": "number", "description": "Σw（只含可计数向量）= 类别分母" },
+              "pollutedWeight": { "type": "number", "description": "Σ(w·s) = 类别分子" }
+            }
+          }
+        }
+      }
+    },
+    "blindSpots": {
+      "type": "array",
+      "description": "【产品卖点】包确实被改过，但某类别仍为 100 分 → 整类检测对本次修补失明。按类别聚合，vectors 列出该类别里判为 CLEAN 的向量 id。",
+      "items": {
+        "type": "object",
+        "required": ["category", "why", "vectors"],
+        "properties": {
+          "category": { "type": "string" },
+          "label": { "type": "string" },
+          "score": { "type": "number", "const": 100.0 },
+          "weight": { "type": "number" },
+          "counted": { "type": "boolean", "description": "false = 本 profile 下该类权重为 0（不计总分），但漏检事实成立" },
+          "why": { "type": "string", "const": "pkg-modified-but-category-clean" },
+          "text": { "type": "string", "description": "给人看的一句话：包已改动，但 <类别> 一条都没抓到" },
+          "vectors": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "falsePositives": {
+      "type": "array",
+      "description": "【产品卖点】包没被改，且该向量在 baseline 里就已 TAMPERED → 环境固有噪声，不扣分只标注。需要 --baseline 才可能非空。",
+      "items": {
+        "type": "object",
+        "required": ["vector", "why"],
+        "properties": {
+          "vector": { "type": "string" },
+          "category": { "type": "string" },
+          "why": { "type": "string", "const": "baseline-clean-but-tampered" },
+          "tier": { "type": "string" },
+          "weight": { "type": "integer" },
+          "evidence": { "type": "string" },
+          "baselineEvidence": { "type": "string" },
+          "text": { "type": "string" }
+        }
+      }
+    },
+    "noiseFromBaseline": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "falsePositives 的向量 id 平铺列表，便于 CI 做白名单比对"
+    },
+    "packageModified": {
+      "type": "object",
+      "required": ["modified", "reasons"],
+      "properties": {
+        "modified": { "type": "boolean" },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "vector": { "type": "string" },
+              "why": { "type": "string", "enum": ["cli-expect-mismatch", "facts-expect-mismatch"] },
+              "evidence": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "appSummaryCheck": {
+      "type": "object",
+      "description": "App 自算 summary（Score.java）与 CLI 用同一公式重算（litmus_score.py）的对账结果。match=false 说明两侧公式漂移，必须先修公式再看分数。",
+      "properties": {
+        "checked": { "type": "boolean" },
+        "match": { "type": "boolean" },
+        "reason": { "type": "string" },
+        "appScore": { "type": ["number", "null"] },
+        "cliScore": { "type": ["number", "null"] },
+        "scoreDelta": { "type": ["number", "null"] },
+        "countDeltas": { "type": "object" }
+      }
+    },
+    "validation": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "契约告警（schema 不符 / id 前缀与 category 不符 / verdict 非法 / id 重复…）。非空只警告不阻断。"
+    }
+  }
+}

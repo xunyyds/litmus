@@ -1,0 +1,175 @@
+{
+  "schema": "litmus.app-report/1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Litmus App 产出 report.json（契约 docs/04-契约.md §4.1，schema litmus.report/1）",
+  "description": "靶包（canary）检测内核跑完一次后由 LitmusRunner.run() 组装、publish() 落盘并打到 logcat 的报告。CLI 只读不改。",
+  "type": "object",
+  "required": ["schema", "producer", "run", "app", "device", "facts", "signals", "summary"],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "const": "litmus.report/1",
+      "description": "报告格式版本。改字段必须同时改本文件与 docs/04-契约.md 并升版本。"
+    },
+    "producer": {
+      "type": "object",
+      "required": ["name", "version", "flavor"],
+      "properties": {
+        "name": { "type": "string", "examples": ["io.litmus.canary"] },
+        "version": { "type": "string", "examples": ["0.1.0"] },
+        "flavor": { "type": "string", "enum": ["release", "debug", "dev"] },
+        "buildUtc": { "type": "string", "description": "ISO-8601 UTC，形如 2026-11-10T08:00:00Z" },
+        "kitId": { "type": "string" },
+        "hasNative": { "type": "boolean", "description": "native 探针是否可用（false 时 rt.* 多为 UNKNOWN）" }
+      }
+    },
+    "run": {
+      "type": "object",
+      "required": ["id", "collectedAt"],
+      "properties": {
+        "id": { "type": "string", "description": "本次运行 id，CLI 把它记进 run.json.run.appRunId 用于对账" },
+        "collectedAt": { "type": "string" },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "passes": { "type": "integer", "minimum": 1 },
+        "probeCount": { "type": "integer", "minimum": 0 },
+        "snapshotError": {
+          "type": "string",
+          "description": "AppSnapshot 失败原因。非空时 facts 会缺项，CLI 的 pkg.* 两条信号会判 UNKNOWN（绝不判 TAMPERED）"
+        }
+      }
+    },
+    "app": {
+      "type": "object",
+      "required": ["package"],
+      "properties": {
+        "package": { "type": "string" },
+        "pid": { "type": "integer" },
+        "uid": { "type": "integer" },
+        "process": { "type": "string" },
+        "codePath": { "type": "string", "description": "base.apk 绝对路径" },
+        "debuggable": { "type": "boolean" },
+        "targetSdk": { "type": "integer" }
+      }
+    },
+    "device": {
+      "type": "object",
+      "properties": {
+        "manufacturer": { "type": "string" },
+        "model": { "type": "string" },
+        "brand": { "type": "string" },
+        "fingerprint": { "type": "string" },
+        "sdk": { "type": "integer" },
+        "release": { "type": "string" },
+        "abis": { "type": "array", "items": { "type": "string" } },
+        "emulatorHint": { "type": "boolean" }
+      }
+    },
+    "facts": {
+      "type": "object",
+      "description": "原始观测值（不做判定）。CLI 用它与 build-info.json 交叉复核。",
+      "properties": {
+        "apk.sha256": { "type": "string", "description": "codePath 文件内容 SHA-256（小写 hex），CLI 比对 expect.apkSha256" },
+        "apk.zip.fingerprint": { "type": "string", "description": "ZipEntry 指纹，算法见契约 §4.4；契约 §4.1 示例里也写作 zip.fingerprint，CLI 两个 key 都认" },
+        "zip.fingerprint": { "type": "string", "description": "apk.zip.fingerprint 的旧写法（契约 §4.1 示例），二者等价" },
+        "apk.codePath": { "type": "string" },
+        "apk.dex.count": { "type": "integer" },
+        "apk.dex.bytes": { "type": "integer" },
+        "apk.multipleSigners": { "type": "boolean" },
+        "apk.installer": { "type": "string" },
+        "cert.install": { "type": "array", "items": { "type": "string" }, "description": "GET_SIGNATURES 证书 DER 的 SHA-256 列表" },
+        "cert.signing": { "type": "array", "items": { "type": "string" } },
+        "cert.history": { "type": "array", "items": { "type": "string" } },
+        "app.componentFactory": { "type": "string" },
+        "app.class": { "type": "string" },
+        "app.debuggable": { "type": "boolean" },
+        "app.targetSdk": { "type": "integer" },
+        "native.abi": { "type": "string" },
+        "native.pid": { "type": "integer" },
+        "native.tracerPid": { "type": "integer" },
+        "native.threadCount": { "type": "integer" },
+        "native.anonExecCount": { "type": "integer" },
+        "native.rwxCount": { "type": "integer" },
+        "native.memfdCount": { "type": "integer" },
+        "native.deletedCount": { "type": "integer" },
+        "native.inlineHits": { "type": "integer" },
+        "native.gotBad": { "type": "integer" }
+      },
+      "additionalProperties": true
+    },
+    "signals": {
+      "type": "array",
+      "description": "一 Probe 一 signal，顺序即 ProbeRegistry 顺序。同一 id 不得出现两次。",
+      "items": { "$ref": "#/$defs/signal" }
+    },
+    "summary": {
+      "type": "object",
+      "description": "App 侧 Score.summarize() 的结果。CLI 会用 litmus_score.summarize() 对同一批 signal 重算并比对（run.json.appSummaryCheck），这是两侧公式一致性的可执行证据。",
+      "required": ["total", "clean", "suspect", "tampered", "unknown", "error", "flaky"],
+      "properties": {
+        "total": { "type": "integer" },
+        "clean": { "type": "integer" },
+        "suspect": { "type": "integer" },
+        "tampered": { "type": "integer" },
+        "unknown": { "type": "integer" },
+        "error": { "type": "integer" },
+        "flaky": { "type": "integer" },
+        "score": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100,
+          "description": "null = 没有任何可计数 signal（全部 UNKNOWN/ERROR/FLAKY）"
+        },
+        "categories": { "type": "array", "items": { "$ref": "#/$defs/categoryScore" } }
+      }
+    }
+  },
+  "$defs": {
+    "verdict": {
+      "type": "string",
+      "enum": ["CLEAN", "SUSPECT", "TAMPERED", "UNKNOWN", "ERROR", "FLAKY"],
+      "description": "CLEAN=未发现篡改 / SUSPECT=有痕迹证据不足 / TAMPERED=确认被改 / UNKNOWN=本设备测不了 / ERROR=探针炸了 / FLAKY=多次采样不一致。后三者不进分母但计数。"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["runtime-integrity", "injection", "package-integrity", "privilege", "virtualization", "environment"]
+    },
+    "signal": {
+      "type": "object",
+      "required": ["id", "category", "verdict", "confidence", "weight", "tier", "evidence"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(rt|inj|pkg|priv|virt|env)\\.[a-z0-9_.]+$",
+          "description": "稳定向量 id，前缀必须与 category 对应（rt./inj./pkg./priv./virt./env.）"
+        },
+        "category": { "$ref": "#/$defs/category" },
+        "verdict": { "$ref": "#/$defs/verdict" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "weight": { "type": "integer", "minimum": 1, "maximum": 5, "default": 3 },
+        "tier": { "type": "string", "enum": ["A", "B", "C"], "default": "B" },
+        "evidence": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "一行给人看的证据：不含隐私、≤300 字符、写清读了哪个文件/API/偏移"
+        },
+        "ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "categoryScore": {
+      "type": "object",
+      "required": ["id", "weight", "score"],
+      "properties": {
+        "id": { "$ref": "#/$defs/category" },
+        "weight": { "type": "number", "minimum": 0, "maximum": 1 },
+        "score": {
+          "type": ["number", "null"],
+          "description": "null = 该类别没有可计数 signal（全 UNKNOWN/ERROR/FLAKY），不参与总分聚合"
+        },
+        "tampered": { "type": "integer" },
+        "suspect": { "type": "integer" },
+        "clean": { "type": "integer" },
+        "total": { "type": "integer" }
+      }
+    }
+  }
+}
