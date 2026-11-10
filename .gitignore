@@ -1,0 +1,43 @@
+# ---- build outputs ----
+build/
+out/
+dist/
+canary/build/
+canary/out/
+cli/__pycache__/
+*.pyc
+
+# ---- android ----
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+*.idsig
+local.properties
+canary/out/gen/
+
+# ---- native ----
+*.so
+*.o
+*.a
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+.cxx/
+build.ninja
+.ninja_deps
+.ninja_log
+
+# ---- reports / runs ----
+report/
+reports/
+runs/
+*.log
+
+# ---- ide ----
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
