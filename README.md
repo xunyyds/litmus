@@ -98,9 +98,9 @@ Momo / Ruru 那类工具解决的是「**我这台机器脏不脏**」，给的�
 
 三个页签 + 一张详情卡 + 一条历史，全部手绘、零第三方依赖（`import` 只有 `android.*` / `java.*` / `org.json`）。
 
-| 总览 | 向量 | 详情卡 |
-| --- | --- | --- |
-| ![总览](docs/images/ui-home.png) | ![向量](docs/images/ui-vectors.png) | ![详情](docs/images/ui-detail.png) |
+| 总览 | 应用内 HTML 报告 |
+| --- | --- |
+| ![总览](docs/images/ui-home.png) | ![报告](docs/images/ui-html-report.png) |
 
 - **总览**：环形分数 + 状态句 + 最近 5 次运行（点一下切回那次，长按删除）
 - **向量**：筛选 chips（全部/篡改/可疑/未判）+ 搜索 + 分组列表；点任意一行 → 底部详情卡
@@ -123,7 +123,8 @@ Momo / Ruru 那类工具解决的是「**我这台机器脏不脏**」，给的�
 > 但「虚拟化/多开和环境面」一条都没抓到 —— 这几类对本次修补是失明的，见 ⑥。
 
 ⑥ 对每个盲区都给「为什么可能是洞」+「怎么验证是不是洞（3 个可执行步骤）」；
-⑧ 的行动清单带**预估收益与成本**。样例：[examples/report-C2-repack.md](examples/report-C2-repack.md) · [HTML 版](examples/report-C2-repack.html)。
+⑧ 的行动清单带**预估收益与成本**。样例：[examples/report-real-clean.md](examples/report-real-clean.md) · [HTML 版](examples/report-real-clean.html)（真机 47 条向量）。
+想看「包被改过 + 盲区」那版，不用设备也能生成：`python cli/litmus.py demo --fixture b`。
 
 ## 快速开始
 
